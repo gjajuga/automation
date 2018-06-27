@@ -1,0 +1,208 @@
+%define name oracle-db-12cR2-preinstall
+%define version 1.0
+%define release 1.rhl7
+
+Summary: Sets the system for Oracle Database single instance and Real Application Cluster install for Oracle Linux 7
+Name: %{name}
+Version: %{version}
+Release: %{release}
+Group: Test Environment/Libraries
+License: GPLv2
+Vendor:Oracle
+Source: %{name}-%{version}.tar.gz
+
+Provides: %{name} = %{version}
+
+Requires(pre):/etc/redhat-release
+
+#System requirement
+Requires:procps module-init-tools ethtool initscripts 
+Requires:xorg-x11-utils xorg-x11-xauth 
+Requires:smartmontools quota
+Requires:binutils compat-libstdc++-33 glibc glibc-devel rpcbind
+Requires:ksh libaio libaio-devel libgcc libstdc++ libstdc++-devel 
+Requires:make sysstat openssh-clients compat-libcap1 nfs-utils xorg-x11-apps
+
+BuildRoot: %{_builddir}/%{name}-%{version}-root
+
+%description
+The Oracle Preinstallation RPM package installs software packages and sets system parameters required for Oracle Database single instance and Oracle Real Application Clusters installations for Oracle Linux Release 7
+Files affected: /etc/sysctl.conf, /boot/grub/menu.lst OR /boot/grub2/grub.cfg 
+Files added: /etc/security/limits.d/oracle-db-12cR2-preinstall.conf
+
+
+%prep
+echo RPM_BUILD_ROOT=$RPM_BUILD_ROOT
+%setup -q
+
+
+%build
+
+%install
+rm -rf $RPM_BUILD_ROOT
+
+mkdir -p -m 755 $RPM_BUILD_ROOT/etc/sysconfig/%{name}
+mkdir -p -m 755 $RPM_BUILD_ROOT/usr/bin
+mkdir -p -m 755 $RPM_BUILD_ROOT/etc/rc.d/init.d
+mkdir -p -m 755 $RPM_BUILD_ROOT/etc/security/limits.d
+mkdir -p -m 700 $RPM_BUILD_ROOT/var/log/%{name}/results
+mkdir -p -m 777 $RPM_BUILD_ROOT/home/oracle
+mkdir -p -m 755 $RPM_BUILD_ROOT/home/oracle/bin 
+
+
+install -m 700 oracle-db-12cR2-preinstall-verify $RPM_BUILD_ROOT/etc/sysconfig/%{name}
+install -m 700 oracle-db-12cR2-preinstall-verify $RPM_BUILD_ROOT/usr/bin
+install -m 600 oracle-db-12cR2-preinstall.param $RPM_BUILD_ROOT/etc/sysconfig/%{name}
+install -m 700 oracle-db-12cR2-preinstall-firstboot $RPM_BUILD_ROOT/etc/rc.d/init.d
+
+install -m 644 .bash_profile $RPM_BUILD_ROOT/home/oracle/.bash_profile
+install -m 644 db.env $RPM_BUILD_ROOT/home/oracle/bin/db.env
+install -m 644 grid.env $RPM_BUILD_ROOT/home/oracle/bin/grid.env
+
+
+touch $RPM_BUILD_ROOT/etc/security/limits.d/oracle-db-server-12cR2-preinstall.conf
+ln -f -s /etc/sysconfig/%{name}/oracle-db-12cR2-preinstall-verify $RPM_BUILD_ROOT/usr/bin/oracle-db-12cR2-preinstall-verify
+
+
+%clean
+rm -rf $RPM_BUILD_ROOT
+
+%pre
+echo "=========================================== Company enable rhel-7-server-optional-rpms : ============================================================"
+subscription-manager repos --enable=rhel-7-server-optional-rpms
+
+echo "=========================================== Company atrybuty dla plików : ==========================================================================="
+
+if lsattr /etc/passwd | grep -q "i";
+ then
+   echo "=========================================== Company zmieniam artybut dla /etc/passwd ============================================================="
+   chattr -i /etc/passwd
+else
+   echo  '	Artybut jest ok'
+fi
+
+
+if lsattr /etc/group | grep -q "i";
+ then
+ echo "=========================================== Company zmieniam artybut dla /etc/group ================================================================"
+   chattr -i /etc/group
+else
+   echo  '	Artybut jest ok'
+fi
+
+echo "=========================================== Company tworze grupy dla oracle user: ==================================================================="
+
+if [ `grep -c ^oinstall /etc/group` = "0" ]; then
+/usr/sbin/groupadd -g 54321 oinstall
+fi
+
+if [ `grep -c ^dba /etc/group` = "0" ]; then
+/usr/sbin/groupadd -g 54322 dba
+fi
+
+if [ `grep -c ^oper /etc/group` = "0" ]; then
+/usr/sbin/groupadd -g 54323 oper
+fi
+
+if [ `grep -c ^asmadmin /etc/group` = "0" ]; then
+/usr/sbin/groupadd -g 54324 asmadmin
+fi
+
+if [ `grep -c ^asmdba /etc/group` = "0" ]; then
+/usr/sbin/groupadd -g 54325 asmdba
+fi
+
+if [ `grep -c ^asmoper /etc/group` = "0" ]; then
+/usr/sbin/groupadd -g 54326 asmoper
+fi
+
+if [ `grep -c ^backupdba /etc/group` = "0" ]; then
+/usr/sbin/groupadd -g 54327 backupdba
+fi
+
+if [ `grep -c ^dgdba /etc/group` = "0" ]; then
+/usr/sbin/groupadd -g 54328 dgdba
+fi
+
+if [ `grep -c ^kmdba /etc/group` = "0" ]; then
+/usr/sbin/groupadd -g 54329 kmdba
+fi
+
+if [ `grep -c ^racdba /etc/group` = "0" ]; then
+/usr/sbin/groupadd -g 54330 racdba
+fi
+
+echo "=========================================== Company tworze uzytkownia oracle:  ======================================================================"
+if [ `grep -c ^oracle /etc/passwd` = "0" ]; then
+/usr/sbin/useradd -u 54321 -g oinstall -G dba,oper,asmadmin,asmdba,asmoper,backupdba,dgdba,kmdba,racdba oracle
+fi
+
+echo "	useradd -u 54321 -g oinstall -G dba,oper,asmadmin,asmdba,asmoper,backupdba,dgdba,kmdba,racdba oracle  " 
+
+echo "=========================================== Company zmiana hasła ===================================================================================="
+echo oraStart12|passwd --stdin oracle
+echo "	hasło zmienione "
+echo " "
+
+
+echo "=========================================== Company tworzenie katalogów ============================================================================="
+mkdir -p /u01/app/{oraInventory,oracle/product/12.2.0/{db_1,grid_1}}
+chmod -R 775 /u01/app/;chown -R oracle:oinstall /u01/app/oraInventory;chown -R oracle.oinstall /u01/app/oracle;
+
+mkdir -p  /home/oracle/bin
+chmod -R 775 /u01/app/;chown -R oracle:oinstall /home/oracle/bin
+
+echo "	katalogi utworzone /u01/app/ "
+
+if [ -f  /etc/sysconfig/%{name}/oracle-db-12cR2-preinstall.param ]; then 
+  cp -f /etc/sysconfig/%{name}/oracle-db-12cR2-preinstall.param /var/log/%{name}/results/.oracle-db-12cR2-preinstall.param 
+fi
+
+if [ -d /etc/sysconfig/%{name} ]; then
+  rm -rf /etc/sysconfig/%{name} 
+fi	
+
+
+%preun
+if [ "$1" = "0" ] ; then # last uninstall
+ chkconfig --del oracle-db-12cR2-preinstall-firstboot
+ if [ -x /usr/bin/oracle-db-12cR2-preinstall-verify ]; then
+   /usr/bin/oracle-db-12cR2-preinstall-verify -u 2> /dev/null 1>&2
+ fi
+fi
+
+%posttrans
+/usr/bin/oracle-db-12cR2-preinstall-verify 2>/dev/null 1>&2
+if ! [ -f /etc/sysconfig/%{name}/oracle-db-server-12cR2-preinstall.conf ]; then
+  chkconfig --add oracle-db-12cR2-preinstall-firstboot
+fi
+
+%postun
+if [ "$1" = "0" ] ; then # last uninstall
+ if [ -d /etc/sysconfig/%{name} ]; then
+   rm -rf /etc/sysconfig/%{name} 
+ fi
+ if [ -d /var/log/%{name} ]; then	
+   rm -rf /var/log/%{name} 	
+ fi
+fi
+
+%files
+%defattr(-,root,root)
+%config /etc/sysconfig/%{name}/oracle-db-12cR2-preinstall.param
+%ghost /etc/security/limits.d/oracle-db-server-12cR2-preinstall.conf
+/etc/sysconfig/%{name}
+/etc/rc.d/init.d/oracle-db-12cR2-preinstall-firstboot
+/etc/sysconfig/%{name}/oracle-db-12cR2-preinstall-verify  
+/var/log/%{name}
+/usr/bin/oracle-db-12cR2-preinstall-verify
+%defattr(-,oracle,oinstall)
+/home/oracle/.bash_profile
+/home/oracle/bin
+
+%post 
+su - oracle -c  "sed -i -e "s/oraserver/$(hostname)/g" /home/oracle/.bash_profile"
+
+%changelog
+* Wed Jun 13 2018 Przygotowanie Grzegorz Jajuga grzegorz.jajuga@bgzbnpparibas.pl [1.1.el7]
+-- Utworzono rpm
